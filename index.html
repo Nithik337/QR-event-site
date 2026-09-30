@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>QR Event Platform</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#181a22;--mu:#666c7e;--bd:#e3e6ef;--ac:#4f46e5;--ok:#16a34a;--no:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1117;--card:#181b25;--tx:#eceef5;--mu:#9aa0b4;--bd:#2a2e3c;--ac:#818cf8}}
+:root[data-theme="dark"]{--bg:#0f1117;--card:#181b25;--tx:#eceef5;--mu:#9aa0b4;--bd:#2a2e3c;--ac:#818cf8}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#nav{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
+#nav a{margin-left:6px;padding:6px 12px;border-radius:99px;color:var(--mu);text-decoration:none;font-size:14px}#nav a.on{background:var(--ac);color:#fff}
+.wrap{max-width:480px;margin:0 auto;padding:16px}.wrap.w{max-width:980px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+.b{display:block;width:100%;padding:13px;margin:8px 0;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;box-sizing:border-box}
+.b.pri{background:var(--ac);color:#fff;border-color:var(--ac)}.yes{border-color:var(--ok)}.no{border-color:var(--no)}
+.b.s{display:inline-block;width:auto;padding:6px 12px;margin:2px;font-size:14px}
+.two{display:grid;gap:8px}.two .b{margin:0}.mapb{display:flex;gap:8px}.mapb .b{margin:4px 0}
+.hero{height:210px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#ec4899) center/cover;margin-bottom:14px}
+h1{margin:0 0 6px;font-size:26px}h2,h3{margin:0 0 8px}.mu{color:var(--mu)}.sm{font-size:13px;word-break:break-all}
+.row{display:flex;gap:10px;margin:10px 0}.row span:first-child{font-size:20px}
+.ok{background:color-mix(in srgb,var(--ok) 12%,transparent);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px}.tabs button{padding:8px 14px;border-radius:99px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;cursor:pointer;white-space:nowrap}.tabs .on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}.grid .card{margin:0}.grid b{font-size:28px;display:block}
+.sc{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px;text-align:left;border-bottom:1px solid var(--bd)}td.n,th.n{text-align:right}
+.bar{height:10px;background:var(--bd);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.bd{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bd)}.bd.Live{background:var(--ok);color:#fff}.bd.Upcoming{background:var(--ac);color:#fff}
+input,textarea,select{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit;margin:4px 0 12px}
+label.r{display:flex;gap:8px;align-items:center;padding:6px 0}label.r input{width:auto;margin:0}
+blockquote{margin:6px 0;padding:8px 12px;border-left:3px solid var(--ac);background:var(--bg);border-radius:6px}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:9}.mc{text-align:center;max-width:320px}#qc{background:#fff;padding:12px;display:inline-block;border-radius:8px}
+@media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none}.mc button{display:none}}
+</style></head><body>
+<div id="nav"></div><div id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=d=>new Date(d+'T00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const fmtT=t=>{let[h,m]=t.split(':');h=+h;return(h%12||12)+':'+m+(h<12?' AM':' PM')};
+const REASONS=['I\'m busy that day','The time doesn\'t work for me','The event isn\'t interesting to me','I don\'t know anyone going','The location is inconvenient','Other'];
+let S={ev:[],R:[],admin:false},TOK=sessionStorage.getItem('tok')||'';
+async function api(p,m,b){const r=await fetch('/api/'+p,{method:m||'GET',headers:{'content-type':'application/json','x-token':TOK},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(r.status);return r.json()}
+async function load(){try{S=await api('state?me='+encodeURIComponent(Object.values(mine()).join(',')))}catch(e){S={ev:[],R:[],admin:false}}}
+async function login(){try{const r=await api('login','POST',{password:$('#pw').value});TOK=r.token;sessionStorage.setItem('tok',TOK);await load();route()}catch(e){alert('Wrong password')}}
+function logout(){TOK='';sessionStorage.removeItem('tok');load().then(route)}
+const mine=()=>{try{return JSON.parse(localStorage.getItem('qep_me'))||{}}catch(e){return{}}};
+const setMine=m=>{try{localStorage.setItem('qep_me',JSON.stringify(m))}catch(e){}};
+let tab='dash',sel=null,edit=null,pend=null;
+const app=()=>$('#app');
+const status=e=>{const s=new Date(e.date+'T'+e.st),f=new Date(e.date+'T'+e.et),n=new Date();return e.arch?'Archived':n<s?'Upcoming':n<=f?'Live':'Completed'};
+const st=e=>{const rs=S.R.filter(r=>r.e==e.id),y=rs.filter(r=>r.t=='y');return{tot:rs.length,y:y.length,n:rs.length-y.length,reg:y.filter(r=>r.s!='interested').length,att:y.filter(r=>r.s=='attended').length,rs,ys:y}};
+const cur=()=>S.ev.find(e=>e.id==sel)||S.ev[0];
+
+function route(){const m=location.hash.match(/^#\/event\/(.+)/);
+  $('#nav').innerHTML='<b>▦ QR Events</b>'+(S.admin?`<span><a href="#/" class="${m?'':'on'}">Admin</a><a href="#/event/${S.ev[0]?S.ev[0].id:'x'}" class="${m?'on':''}">Student view</a><a href="#" onclick="logout();return false">Sign out</a></span>`:'');
+  m?student(m[1]):admin();window.scrollTo(0,0)}
+window.addEventListener('hashchange',()=>load().then(route));
+
+/* ---------- calendar & maps ---------- */
+const dt=(e,t)=>e.date.replace(/-/g,'')+'T'+t.replace(':','')+'00';
+const gcal=e=>'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(e.name)+'&dates='+dt(e,e.st)+'/'+dt(e,e.et)+'&details='+encodeURIComponent(e.desc)+'&location='+encodeURIComponent(e.loc);
+const ics=e=>['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//QREvents//EN','BEGIN:VEVENT','UID:'+e.id+'@qrevents','DTSTAMP:'+new Date().toISOString().replace(/[-:]|\.\d+/g,''),'DTSTART:'+dt(e,e.st),'DTEND:'+dt(e,e.et),'SUMMARY:'+e.name,'DESCRIPTION:'+e.desc.replace(/\n/g,' '),'LOCATION:'+e.loc,'END:VEVENT','END:VCALENDAR'].join('\r\n');
+function addCal(id,force){const e=S.ev.find(x=>x.id==id);
+  if(force=='ics'||(!force&&/iPhone|iPad|Macintosh/.test(navigator.userAgent)))location.href='data:text/calendar;charset=utf8,'+encodeURIComponent(ics(e));
+  else window.open(gcal(e),'_blank')}
+const gmap=e=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(e.loc);
+const amap=e=>'https://maps.apple.com/?q='+encodeURIComponent(e.loc);
+
+/* ---------- student side ---------- */
+function student(id){
+  const e=S.ev.find(x=>x.id==id);
+  if(!e){app().innerHTML='<div class="wrap"><div class="card">Event not found.</div></div>';return}
+  try{if(!sessionStorage.getItem('v'+id)){sessionStorage.setItem('v'+id,1);api('view/'+id,'POST')}}catch(x){}
+  const rid=mine()[id],r=rid&&S.R.find(x=>x.id==rid);
+  const undo=`<p class="mu sm"><a href="#" onclick="undo('${id}');return false">Change my answer</a></p>`;
+  const cal=`<button class="b pri" onclick="addCal('${id}')">🗓️ Add to Calendar</button><p class="mu sm" style="margin:0">Also: <a href="#" onclick="addCal('${id}','ics');return false">Apple/Outlook (.ics)</a> · <a href="#" onclick="addCal('${id}','g');return false">Google Calendar</a></p>`;
+  let box;
+  if(!r)box=`<h3>Are you interested in attending?</h3><div class="two"><button class="b yes" onclick="ans('${id}','y')">🟢 Yes, I'm interested</button><button class="b no" onclick="ans('${id}','n')">🔴 No, not this time</button></div>`;
+  else if(r.t=='y')box=`<div class="ok"><h3>🎉 Great!</h3>We've recorded your interest.</div>${cal}`+(r.s=='interested'?`<button class="b" onclick="reg('${r.id}')">Register for this event</button>`:`<p>✅ Status: <b>${r.s}</b></p>`)+undo;
+  else if(r.done)box=`<div class="ok"><h3>Thank you</h3>Your feedback helps us plan better events.</div>${undo}`;
+  else box=`<h3>We'd love your feedback.</h3><p class="mu">Your feedback helps us understand what students want and improve future events.</p><b>Why aren't you interested?</b>${REASONS.map(x=>`<label class="r"><input type="radio" name="why" value="${esc(x)}">${esc(x)}</label>`).join('')}<b>Anything else you'd like us to know?</b><textarea id="cm" rows="3" placeholder="e.g. I'd be interested if this was on a Friday."></textarea><button class="b pri" onclick="sfb('${r.id}')">Submit Feedback</button>`;
+  app().innerHTML=`<div class="wrap"><div class="hero" style="${e.img?`background-image:url(${e.img})`:''}"></div><h1>${esc(e.name)}</h1><p class="mu">${esc(e.desc)}</p>
+  <div class="card"><div class="row"><span>📅</span><span>${fmtD(e.date)}</span></div><div class="row"><span>🕐</span><span>${fmtT(e.st)} – ${fmtT(e.et)}</span></div><div class="row"><span>📍</span><span>${esc(e.loc)}</span></div>
+  <div class="mapb"><a class="b" target="_blank" rel="noopener" href="${gmap(e)}">Google Maps</a><a class="b" target="_blank" rel="noopener" href="${amap(e)}">Apple Maps</a></div></div>
+  ${r&&r.t=='y'?'':cal.replace('b pri','b')}<div class="card">${box}</div></div>`}
+async function ans(id,t){const r=await api('respond','POST',{e:id,t});const m=mine();m[id]=r.id;setMine(m);await load();route()}
+async function sfb(rid){const c=document.querySelector('input[name=why]:checked');await api('response/'+rid,'POST',{r:c?c.value:'Other',c:$('#cm').value.trim(),done:1});await load();route()}
+async function reg(rid){await api('response/'+rid,'POST',{s:'registered'});await load();route()}
+async function undo(id){const m=mine();await api('response/'+m[id],'DELETE');delete m[id];setMine(m);await load();route()}
+
+/* ---------- admin side ---------- */
+const V={
+dash(){const a=S.ev.map(st),T=a.reduce((s,x)=>s+x.tot,0),Y=a.reduce((s,x)=>s+x.y,0);
+  return`<div class="grid"><div class="card">Total responses<b>${T}</b></div><div class="card">Interested<b>${Y}</b></div><div class="card">Not interested<b>${T-Y}</b></div><div class="card">Interest rate<b>${T?Math.round(Y/T*100):0}%</b></div></div>
+  <div class="card sc"><table><tr><th>Event</th><th>Status</th><th class="n">Scans</th><th class="n">Responses</th><th class="n">Interested</th><th class="n">Not</th></tr>${S.ev.map((e,i)=>`<tr><td>${esc(e.name)}</td><td><span class="bd ${status(e)}">${status(e)}</span></td><td class="n">${e.v||0}</td><td class="n">${a[i].tot}</td><td class="n">${a[i].y}</td><td class="n">${a[i].n}</td></tr>`).join('')}</table></div>`},
+events(){return`<button class="b pri" style="max-width:240px" onclick="tab='new';edit=null;pend=null;route()">+ Create New Event</button>`+S.ev.map(e=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(e.name)}</h3><span class="bd ${status(e)}">${status(e)}</span></div><p class="mu">${fmtD(e.date)} · ${fmtT(e.st)}–${fmtT(e.et)} · ${esc(e.loc)}</p>
+  <a class="b s" href="#/event/${e.id}">Open page</a><button class="b s" onclick="qr('${e.id}')">Generate QR Code</button><button class="b s" onclick="tab='new';edit='${e.id}';pend=null;route()">Edit</button><button class="b s" onclick="arch('${e.id}')">${e.arch?'Unarchive':'Archive'}</button><button class="b s" onclick="del('${e.id}')">Delete</button></div>`).join('')},
+new(){const e=edit&&S.ev.find(x=>x.id==edit)||{name:'',desc:'',date:'',st:'18:00',et:'21:00',loc:'',img:''};
+  return`<div class="card"><h2>${edit?'Edit Event':'Create Event'}</h2>
+  <label>Event name<input id="fn" value="${esc(e.name)}"></label><label>Description<textarea id="fd" rows="3">${esc(e.desc)}</textarea></label>
+  <label>Date<input id="fdt" type="date" value="${e.date}"></label><label>Start time<input id="fs" type="time" value="${e.st}"></label><label>End time<input id="fe" type="time" value="${e.et}"></label>
+  <label>Location (Google &amp; Apple Maps links are generated from this)<input id="fl" value="${esc(e.loc)}"></label>
+  <label>Event image / flyer<input type="file" accept="image/*" onchange="pick(this)"></label><img id="pv" style="max-width:100%;border-radius:10px;${e.img?'':'display:none'}" src="${e.img}">
+  <button class="b pri" onclick="sv()">${edit?'Save Changes':'Create Event'}</button></div>`},
+fb(){const e=sel=='all'?null:cur(),rs=S.R.filter(r=>r.t=='n'&&(!e||r.e==e.id)),c={};rs.forEach(r=>c[r.r||'Other']=(c[r.r||'Other']||0)+1);
+  return`<div class="card"><h2>💬 Feedback</h2><select onchange="sel=this.value;route()"><option value="all">All events</option>${S.ev.map(x=>`<option value="${x.id}" ${e&&x.id==e.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+  <h3>Why people aren't interested (${rs.length})</h3>${Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div>${Math.round(v/rs.length*100)}% — ${esc(k)}<div class="bar"><i style="width:${v/rs.length*100}%"></i></div></div>`).join('')||'<p class="mu">No feedback yet.</p>'}
+  <h3 style="margin-top:16px">Comments</h3>${rs.filter(r=>r.c).map(r=>`<blockquote>${esc(r.c)}</blockquote>`).join('')||'<p class="mu">No comments yet.</p>'}</div>`},
+att(){const e=cur();if(!e)return'';const s=st(e),done=status(e)=='Completed'||status(e)=='Archived',rg=s.reg;
+  const f=[['Scanned',e.v||0],['Interested',s.y],['Registered',rg],['Attended',s.att],['Didn\'t attend',done?rg-s.att:'—']];
+  return`<div class="card"><h2>Attendance</h2><select onchange="sel=this.value;route()">${S.ev.map(x=>`<option value="${x.id}" ${x.id==e.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+  <div class="grid">${f.map(x=>`<div class="card">${x[0]}<b>${x[1]}</b></div>`).join('')}</div><h3>Check-in list</h3><p class="mu sm">Anonymous responders. Set status at the door or afterwards.</p>
+  ${s.ys.map((r,i)=>`<div class="row" style="align-items:center;justify-content:space-between"><span style="font-size:16px">Student #${i+1}</span><select style="width:auto;margin:0" onchange="setS('${r.id}',this.value)">${['interested','registered','attended'].map(o=>`<option ${r.s==o?'selected':''}>${o}</option>`).join('')}</select></div>`).join('')||'<p class="mu">No interested students yet.</p>'}</div>`}};
+function admin(){
+  if(!S.admin){app().innerHTML=`<div class="wrap"><div class="card" style="text-align:center"><h2>Admin sign in</h2><p class="mu">Organisers only.</p><input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()"><button class="b pri" onclick="login()">Sign in</button></div></div>`;return}
+  const T=[['dash','Dashboard'],['events','Events'],['new','+ Create Event'],['fb','Feedback'],['att','Attendance']];
+  app().innerHTML=`<div class="wrap w"><div class="tabs">${T.map(t=>`<button class="${tab==t[0]?'on':''}" onclick="tab='${t[0]}';edit=null;pend=null;route()">${t[1]}</button>`).join('')}</div>${V[tab]()}</div>`}
+async function setS(id,v){await api('status/'+id,'POST',{s:v});await load();route()}
+async function arch(id){const e=S.ev.find(x=>x.id==id);await api('events','POST',{...e,arch:!e.arch});await load();route()}
+async function del(id){if(!confirm('Delete this event and its responses?'))return;await api('events/'+id,'DELETE');await load();route()}
+function pick(inp){const f=inp.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,800/im.width),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);pend=c.toDataURL('image/jpeg',.8);$('#pv').src=pend;$('#pv').style.display='block'};im.src=rd.result};rd.readAsDataURL(f)}
+async function sv(){const g=i=>$('#'+i).value.trim(),o={name:g('fn'),desc:g('fd'),date:g('fdt'),st:g('fs'),et:g('fe'),loc:g('fl')};
+  if(!o.name||!o.date||!o.st||!o.et||!o.loc){alert('Please fill in name, date, times and location.');return}
+  if(edit)o.id=edit;if(pend!==null)o.img=pend;
+  await api('events','POST',o);await load();edit=null;pend=null;tab='events';route()}
+function qr(id){const e=S.ev.find(x=>x.id==id),u=location.origin+'/#/event/'+id,m=document.createElement('div');m.id='modal';
+  m.innerHTML=`<div class="card mc"><h3>${esc(e.name)}</h3><div id="qc"></div><p><b>Scan to learn more &amp; respond</b></p><p class="mu sm">${esc(u)}</p><button class="b pri" onclick="print()">Print</button><button class="b" onclick="this.closest('#modal').remove()">Close</button></div>`;
+  document.body.appendChild(m);try{new QRCode($('#qc'),{text:u,width:220,height:220})}catch(x){$('#qc').textContent='QR library failed to load'}}
+load().then(route);
+</script></body></html>
